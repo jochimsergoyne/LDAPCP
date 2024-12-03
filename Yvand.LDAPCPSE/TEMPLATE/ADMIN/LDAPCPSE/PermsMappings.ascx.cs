@@ -8,6 +8,7 @@ using System.Text;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 using Yvand.LdapClaimsProvider.Configuration;
+using Yvand.LdapClaimsProvider.Utility;
 
 namespace Yvand.LdapClaimsProvider.Administration
 {
@@ -221,7 +222,7 @@ namespace Yvand.LdapClaimsProvider.Administration
                     html = BuildDirectoryObjectTypeDDL(attr);
                     tr.Cells.Add(GetTableCell(html));
 
-                    html = String.Format(HtmlCellLAttrClass, attr.Value.DirectoryObjectClass, attr.Key);
+                    html = String.Format(HtmlCellLAttrClass, attr.Value.DirectoryObjectClassStringOutput, attr.Key);
                     tr.Cells.Add(GetTableCell(html));
 
                     html = String.Format(HtmlCellLAttrName, attr.Value.DirectoryObjectAttribute, attr.Key);
@@ -355,7 +356,7 @@ namespace Yvand.LdapClaimsProvider.Administration
             ClaimTypeConfig newCTConfig = existingCTConfig.CopyConfiguration();
             newCTConfig.ClaimType = newClaimType;
             newCTConfig.DirectoryObjectType = directoryObjectTypeSelected;
-            newCTConfig.DirectoryObjectClass = formData["input_attrclass_" + itemId].Trim();
+            newCTConfig.DirectoryObjectClasses = ListUtility.StringToList(formData["input_attrclass_" + itemId].Trim());
             newCTConfig.DirectoryObjectAttribute = formData["input_attrname_" + itemId].Trim();
             newCTConfig.DirectoryObjectAttributeForDisplayText = formData["input_LDAPAttrToDisplay_" + itemId];
             newCTConfig.SPEntityDataKey = formData["list_Metadata_" + itemId];
@@ -433,7 +434,7 @@ namespace Yvand.LdapClaimsProvider.Administration
             ClaimTypeConfig newCTConfig = new ClaimTypeConfig();
             newCTConfig.ClaimType = newClaimType;
             newCTConfig.DirectoryObjectType = newDirectoryObjectType;
-            newCTConfig.DirectoryObjectClass = newLdapClass;
+            newCTConfig.DirectoryObjectClasses = ListUtility.StringToList(newLdapClass);
             newCTConfig.DirectoryObjectAttribute = newLdapAttribute;
             newCTConfig.IsAdditionalLdapSearchAttribute = useMainClaimTypeOfDirectoryObject;
             newCTConfig.SPEntityDataKey = newEntityMetadata;

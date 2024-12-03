@@ -95,6 +95,7 @@
     <Compile Include="TEMPLATE\ADMIN\LDAPCPSE\GlobalSettings.ascx.designer.cs">
       <DependentUpon>GlobalSettings.ascx.cs</DependentUpon>
     </Compile>
+    <Compile Include="Utility\ListUtility.cs" />
     <Compile Include="Yvand.LdapClaimsProvider\Administration\LDAPCPSEUserControl.cs">
       <SubType>ASPXCodeBehind</SubType>
     </Compile>

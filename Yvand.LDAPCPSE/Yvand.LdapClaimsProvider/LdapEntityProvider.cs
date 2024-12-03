@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Yvand.LdapClaimsProvider.Configuration;
@@ -235,7 +236,16 @@ namespace Yvand.LdapClaimsProvider
         protected virtual List<string> GetGroupsFromLDAPDirectory(DirectoryConnection ldapConnection, OperationContext currentContext)
         {
             List<string> groups = new List<string>();
-            string ldapFilter = string.Format("(&(ObjectClass={0}) ({1}={2}){3})", this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectClass, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute, currentContext.IncomingEntity.Value, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAdditionalFilter);
+            string ldapObjectClassFilterFormat = "({0}{1})";
+            string ldapObjectClassFormat = "(ObjectClass={0})";
+            string ldapObjectClassResult = "";
+            foreach (string directoryObjectClass in this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectClasses)
+            {
+                ldapObjectClassResult += string.Format(ldapObjectClassFormat, directoryObjectClass);
+            }
+            string ldapObjectClassFilterResult = string.Format(ldapObjectClassFilterFormat, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectClasses.Count > 1 ? "|": "");
+
+            string ldapFilter = string.Format("(&({0}) ({1}={2}){3})", ldapObjectClassFilterResult, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute, currentContext.IncomingEntity.Value, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAdditionalFilter);
             string logMessageCredentials = String.IsNullOrWhiteSpace(ldapConnection.LdapEntry.Username) ? "process identity" : ldapConnection.LdapEntry.Username;
             string directoryDetails = $"from LDAP server \"{ldapConnection.LdapEntry.Path}\" with LDAP filter \"{ldapFilter}\" (authenticate as \"{logMessageCredentials}\" with AuthenticationType \"{ldapConnection.LdapEntry.AuthenticationType}\").";
             Logger.Log($"[{ClaimsProviderName}] Getting LDAP groups of user \"{currentContext.IncomingEntity.Value}\" {directoryDetails}", TraceSeverity.Verbose, EventSeverity.Information, TraceCategory.Augmentation);
@@ -471,7 +481,7 @@ namespace Yvand.LdapClaimsProvider
 
             // Append an additional LDAP filter if needed
             string additionalFilter = String.Empty;
-            if (this.Settings.FilterSecurityGroupsOnly && String.Equals(attributeConfig.DirectoryObjectClass, "group", StringComparison.OrdinalIgnoreCase))
+            if (this.Settings.FilterSecurityGroupsOnly && attributeConfig.DirectoryObjectClasses.Contains("group"))//String.Equals(attributeConfig.DirectoryObjectClass, "group", StringComparison.OrdinalIgnoreCase))
             {
                 additionalFilter = ClaimsProviderConstants.LDAPFilterADSecurityGroupsOnly;
             }
@@ -480,7 +490,17 @@ namespace Yvand.LdapClaimsProvider
                 additionalFilter += attributeConfig.DirectoryObjectAdditionalFilter;
             }
 
-            string filter = String.Format(ClaimsProviderConstants.LDAPFilter, attributeConfig.DirectoryObjectAttribute, inputFormatted, attributeConfig.DirectoryObjectClass, additionalFilter);
+
+            string ldapObjectClassFilterFormat = "({0}{1})";
+            string ldapObjectClassFormat = "(ObjectClass={0})";
+            string ldapObjectClassResult = "";
+            foreach (string directoryObjectClass in this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectClasses)
+            {
+                ldapObjectClassResult += string.Format(ldapObjectClassFormat, directoryObjectClass);
+            }
+            string ldapObjectClassFilterResult = string.Format(ldapObjectClassFilterFormat, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectClasses.Count > 1 ? "|" : "", ldapObjectClassResult);
+
+            string filter = String.Format(ClaimsProviderConstants.LDAPFilter, attributeConfig.DirectoryObjectAttribute, inputFormatted, ldapObjectClassFilterResult, additionalFilter);
             return filter;
         }
 

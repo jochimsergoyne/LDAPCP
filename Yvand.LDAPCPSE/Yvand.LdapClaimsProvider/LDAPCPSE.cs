@@ -243,7 +243,7 @@ namespace Yvand.LdapClaimsProvider
                     String.Equals(x.ClaimType, claimTypeInformation.MappedClaimType, StringComparison.InvariantCultureIgnoreCase) &&
                     !x.IsAdditionalLdapSearchAttribute &&
                     !String.IsNullOrWhiteSpace(x.DirectoryObjectAttribute) &&
-                    !String.IsNullOrWhiteSpace(x.DirectoryObjectClass));
+                    !String.IsNullOrWhiteSpace(x.DirectoryObjectClassStringOutput));
 
                 if (claimTypeConfig == null)
                 {
@@ -303,7 +303,7 @@ namespace Yvand.LdapClaimsProvider
             settings.RuntimeMetadataConfig = settings.ClaimTypes.Where(x =>
                 !String.IsNullOrWhiteSpace(x.SPEntityDataKey) &&
                 !String.IsNullOrWhiteSpace(x.DirectoryObjectAttribute) &&
-                !String.IsNullOrWhiteSpace(x.DirectoryObjectClass));
+                !String.IsNullOrWhiteSpace(x.DirectoryObjectClassStringOutput));
 
             if (settings.LdapConnections == null || settings.LdapConnections.Count < 1)
             {
@@ -679,9 +679,18 @@ namespace Yvand.LdapClaimsProvider
                 foreach (ClaimTypeConfig ctConfig in ctConfigs)
                 {
                     // Skip if: DirectoryObjectClass of current config does not match objectclass of LDAP result
-                    if (!ldapResultProperties["objectclass"].Cast<string>().Contains(ctConfig.DirectoryObjectClass, StringComparer.InvariantCultureIgnoreCase))
+                    foreach (string directoryObjectClass in ctConfig.DirectoryObjectClasses)
                     {
-                        continue;
+                        bool skip = false;
+                        if (!ldapResultProperties["objectclass"].Cast<string>().Contains(directoryObjectClass, StringComparer.InvariantCultureIgnoreCase))
+                        {
+                            skip = true;
+                            continue;
+                        }
+                        if (skip)
+                        {
+                            continue;
+                        }
                     }
 
                     // Skip if: DirectoryObjectAttribute of current config is not found in LDAP result
@@ -732,44 +741,65 @@ namespace Yvand.LdapClaimsProvider
                     {
                         if (ctConfig.DirectoryObjectType == DirectoryObjectType.User)
                         {
-                            if (String.Equals(ctConfig.DirectoryObjectClass, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                            bool skip = false;
+                            foreach (string ctConfigDirectoryObjectClass in ctConfig.DirectoryObjectClasses)
                             {
-                                ctConfigToUseForDuplicateCheck = this.Settings.UserIdentifierClaimTypeConfig;
-
-                                // Get the permission value using the LDAP attribute of the identifier config, if it exists, and skip current LDAP result if it does not exist
-                                if (!ldapResultPropertyNames.Contains(this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparer.InvariantCultureIgnoreCase))
+                                if (this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectClasses.Contains(ctConfigDirectoryObjectClass, StringComparer.InvariantCultureIgnoreCase))
                                 {
-                                    continue;
+                                    ctConfigToUseForDuplicateCheck = this.Settings.UserIdentifierClaimTypeConfig;
+
+                                    // Get the permission value using the LDAP attribute of the identifier config, if it exists, and skip current LDAP result if it does not exist
+                                    if (!ldapResultPropertyNames.Contains(this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparer.InvariantCultureIgnoreCase))
+                                    {
+                                        skip = true;
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        permissionClaimValue = Utils.GetLdapValueAsString(ldapResultProperties[ldapResultPropertyNames.First(x => String.Equals(x, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))][0], this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute);
+                                    }
                                 }
                                 else
                                 {
-                                    permissionClaimValue = Utils.GetLdapValueAsString(ldapResultProperties[ldapResultPropertyNames.First(x => String.Equals(x, this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))][0], this.Settings.UserIdentifierClaimTypeConfig.DirectoryObjectAttribute);
+                                    skip = true;
+                                    continue;
                                 }
                             }
-                            else
+                            if (skip)
                             {
-                                continue;  // Local ClaimTypeConfig is a user but current LDAP result is not, skip
+                                continue;
                             }
                         }
                         else
                         {
-                            if (this.Settings.GroupIdentifierClaimTypeConfig != null && String.Equals(ctConfig.DirectoryObjectClass, this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                            bool skip = false;
+                            foreach (string ctConfigDirectoryObjectClass in ctConfig.DirectoryObjectClasses)
                             {
-                                ctConfigToUseForDuplicateCheck = this.Settings.GroupIdentifierClaimTypeConfig;
-
-                                // Get the permission value using the LDAP attribute of the identifier config, if it exists, and skip current LDAP result if it does not exist
-                                if (!ldapResultPropertyNames.Contains(this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparer.InvariantCultureIgnoreCase))
+                                //if (this.Settings.GroupIdentifierClaimTypeConfig != null && String.Equals(ctConfig.DirectoryObjectClass, this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                                if (this.Settings.GroupIdentifierClaimTypeConfig != null && ctConfig.DirectoryObjectClasses.SequenceEqual(this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectClasses, StringComparer.InvariantCultureIgnoreCase) && ctConfig.DirectoryObjectClasses.Count == this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectClasses.Count)
                                 {
-                                    continue;
+                                    ctConfigToUseForDuplicateCheck = this.Settings.GroupIdentifierClaimTypeConfig;
+
+                                    // Get the permission value using the LDAP attribute of the identifier config, if it exists, and skip current LDAP result if it does not exist
+                                    if (!ldapResultPropertyNames.Contains(this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparer.InvariantCultureIgnoreCase))
+                                    {
+                                        skip = true;
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        permissionClaimValue = Utils.GetLdapValueAsString(ldapResultProperties[ldapResultPropertyNames.First(x => String.Equals(x, this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))][0], this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectAttribute);
+                                    }
                                 }
                                 else
                                 {
-                                    permissionClaimValue = Utils.GetLdapValueAsString(ldapResultProperties[ldapResultPropertyNames.First(x => String.Equals(x, this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))][0], this.Settings.GroupIdentifierClaimTypeConfig.DirectoryObjectAttribute);
+                                    skip = true;
+                                    continue; // Local ClaimTypeConfig is a group but current LDAP result is not, skip
                                 }
                             }
-                            else
+                            if (skip)
                             {
-                                continue;  // Local ClaimTypeConfig is a group but current LDAP result is not, skip
+                                continue;
                             }
                         }
                     }
@@ -829,7 +859,8 @@ namespace Yvand.LdapClaimsProvider
             int nbMetadata = 0;
             // Populate the metadata for this PickerEntity
             // Change condition to fix bug http://ldapcp.codeplex.com/discussions/653087: only rely on the LDAP class
-            foreach (ClaimTypeConfig ctConfig in this.Settings.RuntimeMetadataConfig.Where(x => String.Equals(x.DirectoryObjectClass, result.ClaimTypeConfigMatch.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase)))
+
+            foreach (ClaimTypeConfig ctConfig in this.Settings.RuntimeMetadataConfig.Where(x => String.Equals(x.DirectoryObjectClassStringOutput, result.ClaimTypeConfigMatch.DirectoryObjectClassStringOutput, StringComparison.InvariantCultureIgnoreCase)))
             {
                 // if the the LDAP result has a value for the LDAP attribute of the current metadata, then the metadata can be set
                 if (result.DirectoryResult.DirectoryResultProperties.Contains(ctConfig.DirectoryObjectAttribute) && result.DirectoryResult.DirectoryResultProperties[ctConfig.DirectoryObjectAttribute].Count > 0)

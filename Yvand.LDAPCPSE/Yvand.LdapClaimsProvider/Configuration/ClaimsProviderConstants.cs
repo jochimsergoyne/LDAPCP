@@ -27,7 +27,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
         private static object Lock_SetClaimsProviderVersion = new object();
         public static string RegexDomainFromFullAccountName => "(.*)\\\\.*";
         public static string RegexFullDomainFromEmail => ".*@(.*)";
-        public static string LDAPFilter => "(&(objectclass={2})({0}={1}){3}) ";
+        public static string LDAPFilter => "(&({2})({0}={1}){3}) ";
         public static string LDAPFilterEnabledUsersOnly => "(&(!(userAccountControl:1.2.840.113556.1.4.803:=2))";
         public static string LDAPFilterADSecurityGroupsOnly => "(groupType:1.2.840.113556.1.4.803:=2147483648)";
         private static string _ClaimsProviderVersion;
@@ -106,7 +106,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
                     new ClaimTypeConfig
                     {
                         DirectoryObjectType = DirectoryObjectType.User,
-                        DirectoryObjectClass = "user",
+                        DirectoryObjectClasses = new List<string>(){ "user" },
                         DirectoryObjectAttribute = "userPrincipalName",
                         DirectoryObjectAdditionalFilter = "(!(objectClass=computer))"
                     }
@@ -116,7 +116,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
                     new ClaimTypeConfig
                     {
                         DirectoryObjectType = DirectoryObjectType.User,
-                        DirectoryObjectClass = "user",
+                        DirectoryObjectClasses = new List<string>(){ "user" },
                         DirectoryObjectAttribute = "mail",
                         DirectoryObjectAdditionalFilter = "(!(objectClass=computer))",
                         SPEntityDataKey = EntityMetadataPerLdapAttributes.ContainsKey("mail") ? EntityMetadataPerLdapAttributes["mail"] : String.Empty,
@@ -127,7 +127,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
                     new ClaimTypeConfig
                     {
                         DirectoryObjectType = DirectoryObjectType.User,
-                        DirectoryObjectClass = "user",
+                        DirectoryObjectClasses = new List<string>(){ "user" },
                         DirectoryObjectAttribute = "sAMAccountName",
                         DirectoryObjectAdditionalFilter = "(!(objectClass=computer))",
                         SPEntityDataKey = EntityMetadataPerLdapAttributes.ContainsKey("sAMAccountName") ? EntityMetadataPerLdapAttributes["sAMAccountName"] : String.Empty,
@@ -138,7 +138,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
                     new ClaimTypeConfig
                     {
                         DirectoryObjectType = DirectoryObjectType.User,
-                        DirectoryObjectClass = "user",
+                        DirectoryObjectClasses = new List<string>(){ "user" },
                         DirectoryObjectAttribute = "objectsid",
                         DirectoryObjectAttributeSupportsWildcard = false,
                         SPEntityDataKey = EntityMetadataPerLdapAttributes.ContainsKey("objectsid") ? EntityMetadataPerLdapAttributes["objectsid"] : String.Empty,

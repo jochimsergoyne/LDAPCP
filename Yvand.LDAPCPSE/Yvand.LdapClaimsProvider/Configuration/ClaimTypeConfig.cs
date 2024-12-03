@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Remoting.Metadata;
 using Yvand.LdapClaimsProvider.Logging;
+using Yvand.LdapClaimsProvider.Utility;
 using WIF4_5 = System.Security.Claims;
 
 namespace Yvand.LdapClaimsProvider.Configuration
@@ -41,11 +42,26 @@ namespace Yvand.LdapClaimsProvider.Configuration
         /// <summary>
         /// Class of the newAttribute in LDAP, typically 'user' or 'group'
         /// </summary>
-        public string DirectoryObjectClass
+        public List<string> DirectoryObjectClasses
         {
-            get { return _DirectoryObjectClass; }
-            set { _DirectoryObjectClass = value; }
+            get
+            {
+                return _DirectoryObjectClass
+                    .Split(new char[] { ';' } , StringSplitOptions.RemoveEmptyEntries)
+                    .Select(directoryObjectClass => directoryObjectClass.Trim())
+                    .ToList<string>();
+            }
+            set { _DirectoryObjectClass = string.Join(";", value); }
         }
+
+        public string DirectoryObjectClassStringOutput
+        {
+            get
+            {
+                return _DirectoryObjectClass;
+            }
+        }
+
         [Persisted]
         private string _DirectoryObjectClass;
 
@@ -324,7 +340,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
 
         internal void Add(ClaimTypeConfig item, bool strictChecks)
         {
-            if (String.IsNullOrEmpty(item.DirectoryObjectAttribute) || String.IsNullOrEmpty(item.DirectoryObjectClass))
+            if (String.IsNullOrEmpty(item.DirectoryObjectAttribute) || String.IsNullOrEmpty(item.DirectoryObjectClassStringOutput))
             {
                 throw new InvalidOperationException($"Properties DirectoryObjectAttribute and DirectoryObjectClass are required");
             }
@@ -356,13 +372,13 @@ namespace Yvand.LdapClaimsProvider.Configuration
 
             if (Contains(item, new ClaimTypeConfigSameDirectoryConfiguration()))
             {
-                throw new InvalidOperationException($"An item with LDAP newAttribute '{item.DirectoryObjectAttribute}' and LDAP class '{item.DirectoryObjectClass}' already exists for the object type '{item.DirectoryObjectType}'");
+                throw new InvalidOperationException($"An item with LDAP newAttribute '{item.DirectoryObjectAttribute}' and LDAP class '{item.DirectoryObjectClasses}' already exists for the object type '{item.DirectoryObjectType}'");
             }
 
             if (Contains(item))
             {
                 if (String.IsNullOrEmpty(item.ClaimType))
-                    throw new InvalidOperationException($"This configuration with LDAP newAttribute '{item.DirectoryObjectAttribute}' and class '{item.DirectoryObjectClass}' already exists in the collection");
+                    throw new InvalidOperationException($"This configuration with LDAP newAttribute '{item.DirectoryObjectAttribute}' and class '{item.DirectoryObjectClasses}' already exists in the collection");
                 else
                     throw new InvalidOperationException($"This configuration with claim type '{item.ClaimType}' already exists in the collection");
             }
@@ -474,24 +490,31 @@ namespace Yvand.LdapClaimsProvider.Configuration
                 return identifierConfigUpdated;
             }
 
-            if (String.Equals(userIdentifierConfig.DirectoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase) &&
-                String.Equals(userIdentifierConfig.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))
-            { return identifierConfigUpdated; }
-
-            // Check if the new DirectoryObjectAttribute / DirectoryObjectClass duplicates an existing item, and delete it if so
-            for (int i = 0; i < innerCol.Count; i++)
+            foreach (string directoryObjectClass in UserIdentifierConfig.DirectoryObjectClasses)
             {
-                ClaimTypeConfig curCT = (ClaimTypeConfig)innerCol[i];
-                if (curCT.DirectoryObjectType == DirectoryObjectType.User &&
-                    String.Equals(curCT.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase) &&
-                    String.Equals(curCT.DirectoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                if (String.Equals(directoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase) &&
+                    String.Equals(userIdentifierConfig.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    innerCol.RemoveAt(i);
-                    break;  // There can be only 1 potential duplicate
+                    return identifierConfigUpdated;
+                }
+
+                // Check if the new DirectoryObjectAttribute / DirectoryObjectClass duplicates an existing item, and delete it if so
+                for (int i = 0; i < innerCol.Count; i++)
+                {
+                    ClaimTypeConfig curCT = (ClaimTypeConfig)innerCol[i];
+                    foreach (string curCTDirectoryObjectClass in curCT.DirectoryObjectClasses) {
+                        if (curCT.DirectoryObjectType == DirectoryObjectType.User &&
+                            String.Equals(curCT.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase) &&
+                            String.Equals(curCTDirectoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            innerCol.RemoveAt(i);
+                            break;  // There can be only 1 potential duplicate
+                        }
+                    }
                 }
             }
 
-            userIdentifierConfig.DirectoryObjectClass = newDirectoryObjectClass;
+            userIdentifierConfig.DirectoryObjectClasses = ListUtility.StringToList(newDirectoryObjectClass);
             userIdentifierConfig.DirectoryObjectAttribute = newDirectoryObjectAttribute;
             identifierConfigUpdated = true;
             return identifierConfigUpdated;
@@ -511,24 +534,30 @@ namespace Yvand.LdapClaimsProvider.Configuration
                 return identifierConfigUpdated;
             }
 
-            if (String.Equals(groupIdentifierConfig.DirectoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase) &&
-                String.Equals(groupIdentifierConfig.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))
-            { return identifierConfigUpdated; }
-
-            // Check if the new DirectoryObjectAttribute / DirectoryObjectClass duplicates an existing item, and delete it if so
-            for (int i = 0; i < innerCol.Count; i++)
+            foreach (string directoryObjectClass in groupIdentifierConfig.DirectoryObjectClasses)
             {
-                ClaimTypeConfig curCT = (ClaimTypeConfig)innerCol[i];
-                if (curCT.DirectoryObjectType == DirectoryObjectType.Group &&
-                    String.Equals(curCT.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase) &&
-                    String.Equals(curCT.DirectoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                if (String.Equals(directoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase) &&
+                    String.Equals(groupIdentifierConfig.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase))
+                { return identifierConfigUpdated; }
+
+                // Check if the new DirectoryObjectAttribute / DirectoryObjectClass duplicates an existing item, and delete it if so
+                for (int i = 0; i < innerCol.Count; i++)
                 {
-                    innerCol.RemoveAt(i);
-                    break;  // There can be only 1 potential duplicate
+                    ClaimTypeConfig curCT = (ClaimTypeConfig)innerCol[i];
+                    foreach (string curCTDirectoryObjectClass in curCT.DirectoryObjectClasses)
+                    {
+                        if (curCT.DirectoryObjectType == DirectoryObjectType.Group &&
+                        String.Equals(curCT.DirectoryObjectAttribute, newDirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase) &&
+                        String.Equals(curCTDirectoryObjectClass, newDirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            innerCol.RemoveAt(i);
+                            break;  // There can be only 1 potential duplicate
+                        }
+                    }
                 }
             }
 
-            groupIdentifierConfig.DirectoryObjectClass = newDirectoryObjectClass;
+            groupIdentifierConfig.DirectoryObjectClasses = ListUtility.StringToList(newDirectoryObjectClass);
             groupIdentifierConfig.DirectoryObjectAttribute = newDirectoryObjectAttribute;
             identifierConfigUpdated = true;
             return identifierConfigUpdated;
@@ -721,7 +750,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
         /// <param name="newSearchAttributesCsv">The new list of LDAP attributes</param>
         /// <param name="ldapClass">The new LDAP class</param>
         /// <param name="entityType">The entity type for which this update applies</param>
-        public void SetSearchAttributesForEntity(string newSearchAttributesCsv, string ldapClass, DirectoryObjectType entityType)
+        public void SetSearchAttributesForEntity(string newSearchAttributesCsv, List<string> ldapClasses, DirectoryObjectType entityType)
         {
             string[] newSearchAttributes = String.IsNullOrWhiteSpace(newSearchAttributesCsv) ? new string[] { } : newSearchAttributesCsv.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             List<string> newSearchAttributesList = newSearchAttributes.ToList();
@@ -744,7 +773,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
                         IsAdditionalLdapSearchAttribute = true,
                         DirectoryObjectType = entityType,
                         DirectoryObjectAttribute = newAttribute,
-                        DirectoryObjectClass = ldapClass,
+                        DirectoryObjectClasses = ldapClasses,
                         SPEntityDataKey = ClaimsProviderConstants.EntityMetadataPerLdapAttributes.ContainsKey(newAttribute) ? ClaimsProviderConstants.EntityMetadataPerLdapAttributes[newAttribute] : String.Empty,
                     };
                     try
@@ -843,9 +872,12 @@ namespace Yvand.LdapClaimsProvider.Configuration
     {
         public override bool Equals(ClaimTypeConfig existingCTConfig, ClaimTypeConfig newCTConfig)
         {
+            bool isEqual = true;
             if (String.Equals(existingCTConfig.ClaimType, newCTConfig.ClaimType, StringComparison.InvariantCultureIgnoreCase) &&
                 String.Equals(existingCTConfig.DirectoryObjectAttribute, newCTConfig.DirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase) &&
-                String.Equals(existingCTConfig.DirectoryObjectClass, newCTConfig.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
+                existingCTConfig.DirectoryObjectClasses.SequenceEqual(newCTConfig.DirectoryObjectClasses, StringComparer.InvariantCultureIgnoreCase) &&
+                existingCTConfig.DirectoryObjectClasses.Count == newCTConfig.DirectoryObjectClasses.Count)
+                //String.Equals(existingCTConfig.DirectoryObjectClass, newCTConfig.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase))
             {
                 return true;
             }
@@ -857,7 +889,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
 
         public override int GetHashCode(ClaimTypeConfig ct)
         {
-            string hCode = ct.ClaimType + ct.DirectoryObjectAttribute + ct.DirectoryObjectClass;
+            string hCode = ct.ClaimType + ct.DirectoryObjectAttribute + ct.DirectoryObjectClassStringOutput;
             return hCode.GetHashCode();
         }
     }
@@ -882,7 +914,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
 
         public override int GetHashCode(ClaimTypeConfig ct)
         {
-            string hCode = ct.ClaimType + ct.DirectoryObjectType + ct.DirectoryObjectAttribute + ct.DirectoryObjectClass;
+            string hCode = ct.ClaimType + ct.DirectoryObjectType + ct.DirectoryObjectAttribute + ct.DirectoryObjectClassStringOutput;
             return hCode.GetHashCode();
         }
     }
@@ -973,7 +1005,9 @@ namespace Yvand.LdapClaimsProvider.Configuration
         public override bool Equals(ClaimTypeConfig existingCTConfig, ClaimTypeConfig newCTConfig)
         {
             if (String.Equals(existingCTConfig.DirectoryObjectAttribute, newCTConfig.DirectoryObjectAttribute, StringComparison.InvariantCultureIgnoreCase) &&
-                String.Equals(existingCTConfig.DirectoryObjectClass, newCTConfig.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase) &&
+                existingCTConfig.DirectoryObjectClasses.SequenceEqual(newCTConfig.DirectoryObjectClasses, StringComparer.InvariantCultureIgnoreCase) &&
+                existingCTConfig.DirectoryObjectClasses.Count == newCTConfig.DirectoryObjectClasses.Count &&
+                //String.Equals(existingCTConfig.DirectoryObjectClass, newCTConfig.DirectoryObjectClass, StringComparison.InvariantCultureIgnoreCase) &&
                 existingCTConfig.DirectoryObjectType == newCTConfig.DirectoryObjectType)
             {
                 return true;
@@ -986,7 +1020,7 @@ namespace Yvand.LdapClaimsProvider.Configuration
 
         public override int GetHashCode(ClaimTypeConfig ct)
         {
-            string hCode = ct.DirectoryObjectAttribute + ct.DirectoryObjectClass + ct.DirectoryObjectType;
+            string hCode = ct.DirectoryObjectAttribute + ct.DirectoryObjectClassStringOutput + ct.DirectoryObjectType;
             return hCode.GetHashCode();
         }
     }
